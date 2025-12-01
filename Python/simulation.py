@@ -18,10 +18,7 @@ def main():
     # Initialize motor
     motors = [DMMotor4340() for _ in range(4)]
     dict = {"motor1": motors[0], "motor2": motors[1], "motor3": motors[2], "motor4": motors[3]}
-    kd_dict = [0.5, 0.5, 0.5, 0.1]
-    # Simulation parameters
-    noise_std = 0.1  # Standard deviation of the torque noise (Nm)
-    
+    kd_dict = [0.25, 0.1, 0.1, 0]    
     # Prime the motors with initial state to prevent "limp" start
     # 1. Compute initial gravity compensation
     data.qvel[:] = 0.0
@@ -51,6 +48,7 @@ def main():
         time_data = []
         motor_torque_data = []
         applied_torque_data = []
+        pos_data = []
 
         start_time = time.time()
         try:
@@ -93,15 +91,14 @@ def main():
                     data.qfrc_applied[:] = qfrc_applied_current 
                     # Apply torques to motors
                     for key, motor in enumerate(motors):
-                        data.ctrl[key] = motor.output_torque() #this is in addition to data.xfrc_applied
+                        data.ctrl[key] = motor.output_torque()
                     
                     # Record data for Joint 2 (index 1)
                     current_time = time.time() - start_time
                     time_data.append(current_time)
                     motor_torque_data.append(data.ctrl[1])
                     applied_torque_data.append(data.qfrc_applied[1])
-
-                    # print(data.ctrl)
+                    pos_data.append(data.qpos[1])                    
                     # 2. Step Simulation
                     mujoco.mj_step(model, data)
                 # 3. Sync Viewer
@@ -119,14 +116,28 @@ def main():
     print("Generating plot...")
     
     try:
-        plt.figure(figsize=(10, 6))
-        plt.plot(time_data, motor_torque_data, label='Motor Torque (Joint 2)', alpha=0.7)
-        plt.plot(time_data, applied_torque_data, label='Applied Torque (Joint 2)', alpha=0.7)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Torque (Nm)')
-        plt.title('Joint 2 Torque Analysis')
-        plt.legend()
-        plt.grid(True)
+        fig, ax1 = plt.subplots(figsize=(10, 6))
+
+        # Plot Torques on Left Axis
+        ax1.plot(time_data, motor_torque_data, label='Motor Torque (Joint 2)', color='tab:blue', alpha=0.7)
+        ax1.plot(time_data, applied_torque_data, label='Applied Torque (Joint 2)', color='tab:orange', alpha=0.7)
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Torque (Nm)', color='tab:blue')
+        ax1.tick_params(axis='y', labelcolor='tab:blue')
+        ax1.grid(True)
+
+        # Plot Position on Right Axis
+        ax2 = ax1.twinx()
+        ax2.plot(time_data, pos_data, label='Position (Joint 2)', color='tab:green', linestyle='--', alpha=0.7)
+        ax2.set_ylabel('Position (rad)', color='tab:green')
+        ax2.tick_params(axis='y', labelcolor='tab:green')
+
+        # Combine legends
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+
+        plt.title('Joint 2 Torque & Position Analysis')
         
         # Save to file
         plt.savefig('torque_plot.png')
