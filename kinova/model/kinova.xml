@@ -27,6 +27,11 @@
   <worldbody>
     <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+    
+    <!-- Target block for camera capture -->
+    <body name="block" pos="0.4 0.3 0.05">
+      <geom type="box" size="0.04 0.04 0.04" rgba="1 0.2 0.2 1"/>
+    </body>
 
     <geom type="mesh" rgba="0.79216 0.81961 0.93333 1" mesh="base_link"/>
     <body name="link1" pos="0 0 0.14045" quat="0.707105 -0.707108 0 0">
@@ -58,6 +63,11 @@
                   <joint name="joint7" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-9 9" damping="0.1" frictionloss="0.1"/>
                   <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link7"/>
                   <geom pos="0 -0.26156 0" quat="1 0 0 0" type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link_tool"/>
+                  <!-- Frame axes at end-effector: Red=X, Green=Y, Blue=Z -->
+                  <site name="ee_x" type="cylinder" pos="0.05 -0.26 0" size="0.005 0.05" rgba="1 0 0 1" euler="0 1.57 0"/>
+                  <site name="ee_y" type="cylinder" pos="0 -0.21 0" size="0.005 0.05" rgba="0 1 0 1" euler="1.57 0 0"/>
+                  <site name="ee_z" type="cylinder" pos="0 -0.26 0.05" size="0.005 0.05" rgba="0 0 1 1"/>
+                  <camera name="wrist_cam" pos="0 0 0.15" xyaxes="-1 0 0 0 0 1" fovy="120"/>
                 </body>
               </body>
             </body>
