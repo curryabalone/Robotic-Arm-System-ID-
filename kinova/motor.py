@@ -46,8 +46,8 @@ class Motor:
         self.velocity_limit = velocity_limit
         self.torque_limit = torque_limit
         
-        # 2ms delay buffer (2 time steps at 1ms each)
-        self.torque_buffer = deque([0.0, 0.0], maxlen=2)
+        # 2ms delay buffer (3 elements: 2ms ago, 1ms ago, current)
+        self.torque_buffer = deque([0.0, 0.0, 0.0], maxlen=3)
         
         # 16-bit encoder (0 to 65535 counts)
         self.encoder_bits = 16
@@ -204,4 +204,4 @@ class Motor:
         self.desired_position = 0.0
         self.desired_velocity = 0.0
         self.feedforward_torque = 0.0
-        self.torque_buffer = deque([0.0, 0.0], maxlen=2)
+        self.torque_buffer = deque([0.0, 0.0, 0.0], maxlen=3)
