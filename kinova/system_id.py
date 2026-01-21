@@ -35,13 +35,13 @@ def system_id():
     
     # Joint parameters: (position_limit, velocity_limit, torque_limit, kp, kd, T_coulomb, T_static, omega_s)
     joint_params = [
-        (np.pi, 2.0, 36.0, 80.0, 8.0, 0.8, 1.2, 0.15),   # Joint 1 - base rotation
-        (np.pi, 2.0, 36.0, 100.0, 10.0, 1.0, 1.5, 0.15), # Joint 2 - shoulder
-        (np.pi, 2.0, 36.0, 80.0, 8.0, 0.8, 1.2, 0.15),   # Joint 3 - shoulder rotation
-        (np.pi, 2.0, 36.0, 60.0, 6.0, 0.7, 1.0, 0.15),   # Joint 4 - elbow
-        (np.pi, 2.5, 9.8, 30.0, 3.0, 0.25, 0.35, 0.2),   # Joint 5 - wrist 1
-        (np.pi, 2.5, 9.8, 30.0, 3.0, 0.25, 0.35, 0.2),   # Joint 6 - wrist 2
-        (np.pi, 2.5, 9.8, 20.0, 2.0, 0.2, 0.3, 0.2),     # Joint 7 - wrist 3
+        (np.pi, 2.0, 36.0, 40.0, 12.0, 0.8, 1.2, 0.15),  # Joint 1 - base rotation
+        (np.pi, 2.0, 36.0, 50.0, 15.0, 1.0, 1.5, 0.15),  # Joint 2 - shoulder
+        (np.pi, 2.0, 36.0, 40.0, 12.0, 0.8, 1.2, 0.15),  # Joint 3 - shoulder rotation
+        (np.pi, 2.0, 36.0, 30.0, 10.0, 0.7, 1.0, 0.15),  # Joint 4 - elbow
+        (np.pi, 2.5, 9.8, 15.0, 5.0, 0.25, 0.35, 0.2),   # Joint 5 - wrist 1
+        (np.pi, 2.5, 9.8, 15.0, 5.0, 0.25, 0.35, 0.2),   # Joint 6 - wrist 2
+        (np.pi, 2.5, 9.8, 10.0, 4.0, 0.2, 0.3, 0.2),     # Joint 7 - wrist 3
     ]
     
     for i, (pos_lim, vel_lim, torque_lim, kp, kd, T_c, T_s, omega_s) in enumerate(joint_params):
@@ -57,55 +57,98 @@ def system_id():
         motor.set_mit_params(kp=kp, kd=kd)
         motors.append(motor)
     
-    # Generate demo trajectory
-    trajectory = generate_demo_trajectory(seconds=10.0)
+    # Generate demo trajectory - test one joint at a time (0-6), or None for all
+    TEST_JOINT = None  # Change this to test different joints: 0-6, or None for all
+    trajectory, velocity = generate_demo_trajectory(seconds=10.0, test_joint=TEST_JOINT)
     
-    # Replay motion
+    # Initialize simulation at first trajectory position
+    data.qpos[:7] = trajectory[0, :]
+    data.qvel[:7] = velocity[0, :]
+    mujoco.mj_forward(model, data)
+    
+    # Initialize motors with current state
+    for i, motor in enumerate(motors):
+        motor.update(data.qpos[i], data.qvel[i])
+    
+    # Replay motion with feedforward + feedback control
     frame_idx = 0
     num_frames = trajectory.shape[0]
-    prev_qpos = trajectory[0, :].copy()
     
-    dt = 0.001  # 1ms timestep
-    slowdown = 5  # Slow down playback for visualization
+    dt = model.opt.timestep  # Use model timestep
+    slowdown = 1  # Slow down playback for visualization
     
     import time
     
     with mujoco.viewer.launch_passive(model, data) as viewer:
         while viewer.is_running():
-            # Update position from trajectory
-            if frame_idx < num_frames:
-                data.qpos[:7] = trajectory[frame_idx, :]
-                # Estimate velocity numerically
-                data.qvel[:7] = (trajectory[frame_idx, :] - prev_qpos) / dt
-                prev_qpos = trajectory[frame_idx, :].copy()
-                frame_idx += 1
-            else:
+            if frame_idx >= num_frames:
                 # Loop trajectory
                 frame_idx = 0
-                prev_qpos = trajectory[0, :].copy()
+                data.qpos[:7] = trajectory[0, :]
+                data.qvel[:7] = velocity[0, :]
+                mujoco.mj_forward(model, data)
+                for i, motor in enumerate(motors):
+                    motor.reset()
+                    motor.update(data.qpos[i], data.qvel[i])
             
-            mujoco.mj_forward(model, data)
+            # Step 1: Calculate feedforward torques using mj_inverse
+            # Set qacc to desired acceleration (from trajectory or zero for position tracking)
+            if frame_idx < num_frames - 1:
+                # Compute desired acceleration from trajectory velocity difference
+                desired_acc = (velocity[frame_idx + 1, :] - velocity[frame_idx, :]) / dt
+            else:
+                desired_acc = np.zeros(7)
+            
+            data.qacc[:7] = desired_acc
+            
+            # Save current velocities, zero them for mj_inverse, then restore
+            saved_qvel = data.qvel[:7].copy()
+            data.qvel[:7] = 0.0
+            
+            # Use mj_inverse to compute required torques for desired motion
+            mujoco.mj_inverse(model, data)
+            feedforward_torques = data.qfrc_inverse[:7].copy()
+            
+            # Restore velocities
+            data.qvel[:7] = saved_qvel
+            
+            # Step 2: For each motor, set feedforward torque and desired position from trajectory
+            for i, motor in enumerate(motors):
+                # For non-test joints, hold at zero with high gains
+                if TEST_JOINT is not None and i != TEST_JOINT:
+                    motor.set_mit_params(
+                        kp=200.0,  # High stiffness to lock joint
+                        kd=20.0,
+                        desired_pos=0.0,
+                        desired_vel=0.0,
+                        ff_torque=feedforward_torques[i]
+                    )
+                else:
+                    motor.set_mit_params(
+                        desired_pos=trajectory[frame_idx, i],
+                        desired_vel=velocity[frame_idx, i],
+                        ff_torque=feedforward_torques[i]
+                    )
+            
+            # Step 3: Compute motor output torques (includes PD feedback + feedforward)
+            output_torques = np.zeros(7)
+            for i, motor in enumerate(motors):
+                output_torques[i] = motor.get_output_torque()
+            
+            # Step 4: Apply torques to simulation and step
+            data.ctrl[:7] = output_torques
+            mujoco.mj_step(model, data)
+            
+            # Step 5: Update motor states with new simulation state
+            for i, motor in enumerate(motors):
+                motor.update(data.qpos[i], data.qvel[i])
+            
+            frame_idx += 1
             
             # Slow down playback
             time.sleep(dt * slowdown)
             
             viewer.sync()
-# Load model
-model_path = os.path.join(os.path.dirname(__file__), "model", "kinova_fullinertia.xml")
-model = mujoco.MjModel.from_xml_path(model_path)
-data = mujoco.MjData(model)
-
-# Find joint site IDs and corresponding body IDs (for rotation matrices)
-joint_site_names = [f"joint{i}" for i in range(1, 8)]
-joint_info = []
-for name in joint_site_names:
-    site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, name)
-    # Get the body that contains this site
-    body_id = model.site_bodyid[site_id] if site_id >= 0 else -1
-    if site_id >= 0:
-        joint_info.append((name, site_id, body_id))
-
-print(f"Tracking {len(joint_info)} joints: {[name for name, _, _ in joint_info]}")
 
 def get_cartesian_velocities(model, data):
     """Compute Cartesian velocity at each joint site in local body frame."""
@@ -152,20 +195,41 @@ def format_velocity_display(velocities):
     return "\n".join(lines)
 
 # Generate a simple oscillating trajectory for demo
-def generate_demo_trajectory(seconds: float, hz: int = 1000):
-    """Generate oscillating motion on first 4 joints."""
+def generate_demo_trajectory(seconds: float, hz: int = 1000, test_joint: int = None):
+    """Generate oscillating motion on joints.
+    
+    Args:
+        seconds: Duration of trajectory
+        hz: Sample rate
+        test_joint: If specified (0-6), only move this joint. If None, move all.
+    
+    Returns:
+        trajectory: (num_samples, 7) array of joint positions
+        velocity: (num_samples, 7) array of joint velocities
+    """
     num_samples = int(seconds * hz)
     t = np.linspace(0, seconds, num_samples)
     trajectory = np.zeros((num_samples, 7))
+    velocity = np.zeros((num_samples, 7))
     
     # Different frequencies for each joint
-    freqs = [0.3, 0.4, 0.5, 0.6]
-    amps = [0.5, 0.4, 0.3, 0.3]
+    freqs = [0.3, 0.4, 0.5, 0.6, 0.3, 0.3, 0.3]
+    amps = [0.5, 0.4, 0.3, 0.3, 0.2, 0.2, 0.2]
     
-    for j in range(4):
-        trajectory[:, j] = amps[j] * np.sin(2 * np.pi * freqs[j] * t)
+    if test_joint is not None:
+        # Only move the specified joint
+        joints_to_move = [test_joint]
+        print(f"Testing joint {test_joint} only")
+    else:
+        # Move first 4 joints
+        joints_to_move = range(4)
     
-    return trajectory
+    for j in joints_to_move:
+        omega = 2 * np.pi * freqs[j]
+        trajectory[:, j] = amps[j] * np.sin(omega * t)
+        velocity[:, j] = amps[j] * omega * np.cos(omega * t)
+    
+    return trajectory, velocity
 
 if __name__ == "__main__":
     system_id()
