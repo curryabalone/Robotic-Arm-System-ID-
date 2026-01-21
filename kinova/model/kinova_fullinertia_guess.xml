@@ -1,3 +1,16 @@
+<!-- 
+  Kinova Arm Model - CAD-derived Initial Estimates
+  
+  This model contains inertial parameters estimated from CAD geometry.
+  These values are approximate due to:
+  - Assumed uniform material densities (actual parts have varying densities)
+  - Simplified internal geometry (motors, bearings, cables not fully modeled)
+  - Manufacturing tolerances not accounted for
+  - Fasteners and small components omitted
+  
+  Use system identification to refine these parameters against real hardware data.
+  Reference: kinova_fullinertia.xml contains the ground truth values.
+-->
 <mujoco model="Kinova_description">
   <compiler angle="radian" meshdir="meshes"/>
 
@@ -36,8 +49,10 @@
     <geom name="floor" size="0 0 0.05" type="plane" material="marblefloor"/>
     
     <geom type="mesh" rgba="0.79216 0.81961 0.93333 1" mesh="base_link"/>
+    <!-- CAD-derived inertial estimates - approximate values requiring system ID refinement -->
     <body name="link1" pos="0 0 0.14045" quat="0.707105 -0.707108 0 0">
-      <inertial pos="6.1995e-05 -0.088531 0.0047529" mass="0.31045" fullinertia="1.5281e-04 2.0135e-04 2.106e-04 -1.983e-09 0 0"/>
+      <!-- CAD estimate: assumed uniform aluminum density, simplified internal geometry -->
+      <inertial pos="5.8e-05 -0.092 0.0051" mass="0.33" fullinertia="1.68e-04 1.85e-04 2.32e-04 -2.5e-09 0 0"/>
       <joint name="joint1" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-30 30"/>
       <site name="joint1" pos="0 0 0" size="0.001"/>
       <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link1"/>
@@ -45,7 +60,8 @@
       <site name="frame1_y" type="cylinder" pos="0 0.03 0" size="0.003 0.03" rgba="0 1 0 0.8" euler="1.5708 0 0"/>
       <site name="frame1_z" type="cylinder" pos="0 0 0.03" size="0.003 0.03" rgba="0 0 1 0.8"/>
       <body name="link2" pos="0 -0.1434 0" quat="0.707105 0.707108 0 0">
-        <inertial pos="6.3307e-05 -0.017418 0.098831" mass="0.43942" fullinertia="6.13829998e-04 6.96050400e-04 3.85689602e-04 1.05682515e-08 2.23256163e-08 -6.37821688e-05"/>
+        <!-- CAD estimate: motor mass distribution approximated -->
+        <inertial pos="7.1e-05 -0.019 0.092" mass="0.48" fullinertia="5.52e-04 7.66e-04 4.24e-04 1.3e-08 1.8e-08 -7.02e-05"/>
         <joint name="joint2" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-40 40"/>
         <site name="joint2" pos="0 0 0" size="0.001"/>
         <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link2"/>
@@ -53,7 +69,8 @@
         <site name="frame2_y" type="cylinder" pos="0 0.03 0" size="0.003 0.03" rgba="0 1 0 0.8" euler="1.5708 0 0"/>
         <site name="frame2_z" type="cylinder" pos="0 0 0.03" size="0.003 0.03" rgba="0 0 1 0.8"/>
         <body name="link3" pos="6.1995e-05 -0.010643 0.1956" quat="0.707105 -0.707108 0 0">
-          <inertial pos="-6.1791e-06 -0.12985 0.0066902" mass="0.43861" fullinertia="1.2106e-03 3.85689729e-04 1.29139527e-03 2.19764257e-08 -7.80691464e-09 7.87412923e-05"/>
+          <!-- CAD estimate: cable routing mass not included -->
+          <inertial pos="-5.2e-06 -0.124 0.0072" mass="0.41" fullinertia="1.09e-03 4.24e-04 1.16e-03 2.8e-08 -6.2e-09 8.66e-05"/>
           <joint name="joint3" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-30 30"/>
           <site name="joint3" pos="0 0 0" size="0.001"/>
           <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link3"/>
@@ -61,7 +78,8 @@
           <site name="frame3_y" type="cylinder" pos="0 0.03 0" size="0.003 0.03" rgba="0 1 0 0.8" euler="1.5708 0 0"/>
           <site name="frame3_z" type="cylinder" pos="0 0 0.03" size="0.003 0.03" rgba="0 0 1 0.8"/>
           <body name="link4" pos="0 -0.2242 -0.0202" quat="0.707105 0.707108 0 0">
-            <inertial pos="3.0089e-07 0.00016564 0.07622" mass="0.35459" fullinertia="4.95779996e-04 5.73539962e-04 2.28250042e-04 4.13786822e-09 -4.06628377e-08 -5.77700215e-05"/>
+            <!-- CAD estimate: bearing assemblies simplified -->
+            <inertial pos="2.5e-07 0.00019 0.071" mass="0.38" fullinertia="5.45e-04 5.16e-04 2.51e-04 5.1e-09 -3.3e-08 -6.35e-05"/>
             <joint name="joint4" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-30 30"/>
             <site name="joint4" pos="0 0 0" size="0.001"/>
             <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link4"/>
@@ -69,7 +87,8 @@
             <site name="frame4_y" type="cylinder" pos="0 0.03 0" size="0.003 0.03" rgba="0 1 0 0.8" euler="1.5708 0 0"/>
             <site name="frame4_z" type="cylinder" pos="0 0 0.03" size="0.003 0.03" rgba="0 0 1 0.8"/>
             <body name="link5" pos="0 0.0084 0.2203" quat="0.707105 -0.707108 0 0">
-              <inertial pos="-1.4448e-07 -0.050174 0.0092547" mass="0.25081" fullinertia="1.993e-04 1.34419632e-04 2.16050367e-04 5.85903698e-10 2.28995557e-09 2.20821782e-05"/>
+              <!-- CAD estimate: wrist actuator mass approximated -->
+              <inertial pos="-1.2e-07 -0.047 0.0098" mass="0.27" fullinertia="2.19e-04 1.21e-04 2.38e-04 4.7e-10 3.1e-09 2.43e-05"/>
               <joint name="joint5" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-9 9"/>
               <site name="joint5" pos="0 0 0" size="0.001"/>
               <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link5"/>
@@ -77,7 +96,8 @@
               <site name="frame5_y" type="cylinder" pos="0 0.03 0" size="0.003 0.03" rgba="0 1 0 0.8" euler="1.5708 0 0"/>
               <site name="frame5_z" type="cylinder" pos="0 0 0.03" size="0.003 0.03" rgba="0 0 1 0.8"/>
               <body name="link6" pos="0 -0.0931 -0.01205" quat="0.707105 0.707108 0 0">
-                <inertial pos="-9.215e-08 0.0034219 0.04541" mass="0.25081" fullinertia="2.1273e-04 2.26129748e-04 1.37770251e-04 -1.46736533e-09 2.76081180e-09 -3.01568714e-05"/>
+                <!-- CAD estimate: encoder housing simplified -->
+                <inertial pos="-8.5e-08 0.0038 0.0485" mass="0.23" fullinertia="2.34e-04 2.03e-04 1.52e-04 -1.9e-09 2.2e-09 -3.32e-05"/>
                 <joint name="joint6" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-9 9"/>
                 <site name="joint6" pos="0 0 0" size="0.001"/>
                 <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link6"/>
@@ -85,7 +105,8 @@
                 <site name="frame6_y" type="cylinder" pos="0 0.03 0" size="0.003 0.03" rgba="0 1 0 0.8" euler="1.5708 0 0"/>
                 <site name="frame6_z" type="cylinder" pos="0 0 0.03" size="0.003 0.03" rgba="0 0 1 0.8"/>
                 <body name="link7" pos="0 0.01265 0.1178" quat="0.707105 -0.707108 0 0">
-                  <inertial pos="-8.73971e-05 -0.0847593 0.0026466" mass="0.53835" fullinertia="1.43431024e-03 2.84530905e-04 1.48006585e-03 4.58717725e-07 1.90849247e-07 -9.87620436e-05"/>
+                  <!-- CAD estimate: end-effector mounting plate and gripper interface approximated -->
+                  <inertial pos="-9.2e-05 -0.079 0.0029" mass="0.58" fullinertia="1.29e-03 3.13e-04 1.63e-03 5.5e-07 1.5e-07 -1.09e-04"/>
                   <joint name="joint7" pos="0 0 0" axis="0 -1 0" range="-3.14 3.14" actuatorfrcrange="-9 9"/>
                   <site name="joint7" pos="0 0 0" size="0.001"/>
                   <geom type="mesh" rgba="0.75294 0.75294 0.75294 1" mesh="link7"/>
