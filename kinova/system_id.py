@@ -11,7 +11,7 @@ import numpy as np
 import os
 
 # Load model
-model_path = os.path.join(os.path.dirname(__file__), "model", "kinova.xml")
+model_path = os.path.join(os.path.dirname(__file__), "model", "kinova_fullinertia.xml")
 model = mujoco.MjModel.from_xml_path(model_path)
 data = mujoco.MjData(model)
 
