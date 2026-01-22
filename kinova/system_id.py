@@ -165,19 +165,18 @@ def system_id():
                         desired_vel=velocity[frame_idx, i],
                         ff_torque=feedforward_torques[i]
                     )
-            
-            # Step 3: Compute motor output torques (includes PD feedback + feedforward)
+            #Step 3: update motor states with current simulation state
+            for i, motor in enumerate(motors):
+                motor.update(data.qpos[i], data.qvel[i])
+        
+            # Step 4: Compute motor output torques (includes PD feedback + feedforward)
             output_torques = np.zeros(7)
             for i, motor in enumerate(motors):
                 output_torques[i] = motor.get_output_torque()
             
-            # Step 4: Apply torques to simulation and step
+            # Step 5: Apply torques to simulation and step
             data.ctrl[:7] = output_torques
-            mujoco.mj_step(model, data)
-            
-            # Step 5: Update motor states with new simulation state
-            for i, motor in enumerate(motors):
-                motor.update(data.qpos[i], data.qvel[i])
+            mujoco.mj_step(model, data)            
             
             frame_idx += 1
             
