@@ -11,6 +11,42 @@ import numpy as np
 import os
 
 
+def view_trajectory():
+    """
+    Simply play the trajectory on the arm using mj_forward (no dynamics/control).
+    Useful for visualizing the desired motion.
+    """
+    model_path = os.path.join(os.path.dirname(__file__), "model", "kinova_fullinertia_guess.xml")
+    model = mujoco.MjModel.from_xml_path(model_path)
+    data = mujoco.MjData(model)
+    
+    # Generate demo trajectory
+    TEST_JOINT = None  # Change to 0-6 to test single joint, or None for all
+    trajectory, velocity = generate_demo_trajectory(seconds=10.0, test_joint=TEST_JOINT)
+    
+    frame_idx = 0
+    num_frames = trajectory.shape[0]
+    dt = 0.001
+    
+    import time
+    
+    with mujoco.viewer.launch_passive(model, data) as viewer:
+        while viewer.is_running():
+            if frame_idx >= num_frames:
+                frame_idx = 0
+            
+            # Directly set joint positions from trajectory
+            data.qpos[:7] = trajectory[frame_idx, :]
+            data.qvel[:7] = velocity[frame_idx, :]
+            
+            # Forward kinematics only (no dynamics)
+            mujoco.mj_forward(model, data)
+            
+            frame_idx += 1
+            time.sleep(dt)
+            viewer.sync()
+
+
 def system_id():
     """
     System identification function for the Kinova arm.
@@ -34,14 +70,17 @@ def system_id():
     motors = []
     
     # Joint parameters: (position_limit, velocity_limit, torque_limit, kp, kd, T_coulomb, T_static, omega_s)
+    # kd=0 for now, kp tuned for ~500 rad/s bandwidth based on inertia at home position
+    # kp = omega_n^2 * I, where omega_n = 500 rad/s
+    # Inertias at home: J0=0.0036, J1=0.91, J2=0.0023, J3=0.20, J4=0.0014, J5=0.024, J6=0.0011
     joint_params = [
-        (np.pi, 2.0, 36.0, 40.0, 12.0, 0.8, 1.2, 0.15),  # Joint 1 - base rotation
-        (np.pi, 2.0, 36.0, 50.0, 15.0, 1.0, 1.5, 0.15),  # Joint 2 - shoulder
-        (np.pi, 2.0, 36.0, 40.0, 12.0, 0.8, 1.2, 0.15),  # Joint 3 - shoulder rotation
-        (np.pi, 2.0, 36.0, 30.0, 10.0, 0.7, 1.0, 0.15),  # Joint 4 - elbow
-        (np.pi, 2.5, 9.8, 15.0, 5.0, 0.25, 0.35, 0.2),   # Joint 5 - wrist 1
-        (np.pi, 2.5, 9.8, 15.0, 5.0, 0.25, 0.35, 0.2),   # Joint 6 - wrist 2
-        (np.pi, 2.5, 9.8, 10.0, 4.0, 0.2, 0.3, 0.2),     # Joint 7 - wrist 3
+        (np.pi, 2.0, 1000.0, 912.0, 0.0, None, None, None),     # Joint 0: 500^2 * 0.0036
+        (np.pi, 2.0, 1000.0, 200.0, 0.0, None, None, None),  # Joint 1: 500^2 * 0.91
+        (np.pi, 2.0, 1000.0, 583.0, 0.0, None, None, None),     # Joint 2: 500^2 * 0.0023
+        (np.pi, 2.0, 1000.0, 500.0, 0.0, None, None, None),   # Joint 3: 500^2 * 0.20
+        (np.pi, 2.5, 1000.0, 350.0, 0.0, None, None, None),     # Joint 4: 500^2 * 0.0014
+        (np.pi, 2.5, 1000.0, 500.0, 0.0, None, None, None),    # Joint 5: 500^2 * 0.024
+        (np.pi, 2.5, 1000.0, 271.0, 0.0, None, None, None),     # Joint 6: 500^2 * 0.0011
     ]
     
     for i, (pos_lim, vel_lim, torque_lim, kp, kd, T_c, T_s, omega_s) in enumerate(joint_params):
@@ -68,14 +107,14 @@ def system_id():
     
     # Initialize motors with current state
     for i, motor in enumerate(motors):
-        motor.update(data.qpos[i], data.qvel[i])
+        motor.update(data.qpos[i], data.qvel[i], initialize=True)
     
     # Replay motion with feedforward + feedback control
     frame_idx = 0
     num_frames = trajectory.shape[0]
     
     dt = model.opt.timestep  # Use model timestep
-    slowdown = 1  # Slow down playback for visualization
+    slowdown = 1  # Real-time playback
     
     import time
     
@@ -89,36 +128,33 @@ def system_id():
                 mujoco.mj_forward(model, data)
                 for i, motor in enumerate(motors):
                     motor.reset()
-                    motor.update(data.qpos[i], data.qvel[i])
+                    motor.update(data.qpos[i], data.qvel[i], initialize=True)
             
-            # Step 1: Calculate feedforward torques using mj_inverse
-            # Set qacc to desired acceleration (from trajectory or zero for position tracking)
-            if frame_idx < num_frames - 1:
-                # Compute desired acceleration from trajectory velocity difference
-                desired_acc = (velocity[frame_idx + 1, :] - velocity[frame_idx, :]) / dt
-            else:
-                desired_acc = np.zeros(7)
+            # Step 1: Calculate feedforward torques
+            # Simple approach: gravity compensation at actual state only
+            # The PD controller will handle trajectory tracking
             
-            data.qacc[:7] = desired_acc
+            actual_qpos = data.qpos[:7].copy()
+            actual_qvel = data.qvel[:7].copy()
             
-            # Save current velocities, zero them for mj_inverse, then restore
-            saved_qvel = data.qvel[:7].copy()
-            data.qvel[:7] = 0.0
-            
-            # Use mj_inverse to compute required torques for desired motion
+            # Gravity comp: inverse dynamics with zero velocity and zero acceleration at actual position
+            data.qvel[:7] = 0
+            data.qacc[:7] = 0
             mujoco.mj_inverse(model, data)
             feedforward_torques = data.qfrc_inverse[:7].copy()
             
-            # Restore velocities
-            data.qvel[:7] = saved_qvel
+            # Restore actual state
+            data.qpos[:7] = actual_qpos
+            data.qvel[:7] = actual_qvel
+            mujoco.mj_forward(model, data)
             
             # Step 2: For each motor, set feedforward torque and desired position from trajectory
             for i, motor in enumerate(motors):
                 # For non-test joints, hold at zero with high gains
                 if TEST_JOINT is not None and i != TEST_JOINT:
                     motor.set_mit_params(
-                        kp=200.0,  # High stiffness to lock joint
-                        kd=20.0,
+                        kp=500.0,  # High stiffness to lock joint
+                        kd=0.0,    # No velocity term (encoder noise)
                         desired_pos=0.0,
                         desired_vel=0.0,
                         ff_torque=feedforward_torques[i]
@@ -147,6 +183,23 @@ def system_id():
             
             # Slow down playback
             time.sleep(dt * slowdown)
+            
+            # Print expected vs actual positions every 100 frames
+            if frame_idx % 100 == 0:
+                print(f"\n--- Frame {frame_idx} ---")
+                # Print effective inertia at joint 0
+                M = np.zeros((model.nv, model.nv))
+                mujoco.mj_fullM(model, M, data.qM)
+                print(f"Joint 0 effective inertia: {M[0,0]:.4f} kg·m²")
+                print(f"{'Joint':<8} {'Expected':>10} {'Actual':>10} {'Error':>10} {'Torque':>10}")
+                for i in range(7):
+                    expected = trajectory[frame_idx, i]
+                    actual = data.qpos[i]
+                    error = expected - actual
+                    torque = output_torques[i]
+                    print(f"Joint {i}  {expected:>10.4f} {actual:>10.4f} {error:>10.4f} {torque:>10.4f}")
+                import sys
+                sys.stdout.flush()
             
             viewer.sync()
 
@@ -213,7 +266,7 @@ def generate_demo_trajectory(seconds: float, hz: int = 1000, test_joint: int = N
     velocity = np.zeros((num_samples, 7))
     
     # Different frequencies for each joint
-    freqs = [0.3, 0.4, 0.5, 0.6, 0.3, 0.3, 0.3]
+    freqs = [0.31, 0.37, 0.43, 0.53, 0.59, 0, 0]
     amps = [0.5, 0.4, 0.3, 0.3, 0.2, 0.2, 0.2]
     
     if test_joint is not None:
@@ -226,10 +279,15 @@ def generate_demo_trajectory(seconds: float, hz: int = 1000, test_joint: int = N
     
     for j in joints_to_move:
         omega = 2 * np.pi * freqs[j]
-        trajectory[:, j] = amps[j] * np.sin(omega * t)
-        velocity[:, j] = amps[j] * omega * np.cos(omega * t)
+        # Use (1 - cos) so trajectory starts at position=0 with velocity=0
+        trajectory[:, j] = amps[j] * (np.cos(omega * t))
+        velocity[:, j] = amps[j] * omega * np.sin(omega * t)
     
     return trajectory, velocity
 
 if __name__ == "__main__":
-    system_id()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "view":
+        view_trajectory()
+    else:
+        system_id()

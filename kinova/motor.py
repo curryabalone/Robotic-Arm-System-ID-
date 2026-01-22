@@ -1,5 +1,4 @@
 import numpy as np
-from collections import deque
 
 
 class Motor:
@@ -51,12 +50,9 @@ class Motor:
         self.velocity_limit = velocity_limit
         self.torque_limit = torque_limit
         
-        # 2ms delay buffer (3 elements: 2ms ago, 1ms ago, current)
-        self.torque_buffer = deque([0.0, 0.0, 0.0], maxlen=3)
-        
-        # 16-bit encoder (0 to 65535 counts)
-        self.encoder_bits = 16
-        self.encoder_resolution = 2**self.encoder_bits  # 65536 counts
+        # 14-bit encoder (0 to 16383 counts)
+        self.encoder_bits = 14
+        self.encoder_resolution = 2**self.encoder_bits  # 16384 counts
         self.dt = 0.001  # 1ms time step
         
         # Stribeck friction model parameters
@@ -64,11 +60,6 @@ class Motor:
         self.T_static = T_static  # Static friction torque (Nm)
         self.omega_s = omega_s  # Stribeck velocity (rad/s)
         self.delta = delta  # Shape factor
-        
-        # Random friction variation (sine wave modulation)
-        # Amplitude is ±20% of friction, phase is random
-        self.friction_sine_phase = np.random.uniform(0, 2 * np.pi)
-        self.friction_sine_amplitude = np.random.uniform(-0.2, 0.2)
         
     def set_mit_params(self, kp=None, kd=None, desired_pos=None, desired_vel=None, ff_torque=None):
         """
@@ -101,7 +92,7 @@ class Motor:
         """
         self.commanded_torque = torque
     
-    def compute_torque(self):
+    def compute_torque(self, debug=False):
         """
         Compute commanded torque using MIT controller or direct command.
         
@@ -116,6 +107,13 @@ class Motor:
             torque_cmd = (self.kp * position_error + 
                          self.kd * velocity_error + 
                          self.feedforward_torque)
+            
+            if debug:
+                print(f"  PD debug: des_pos={self.desired_position:.4f}, act_pos={self.actual_position:.4f}, pos_err={position_error:.4f}")
+                print(f"            des_vel={self.desired_velocity:.4f}, act_vel={self.actual_velocity:.4f}, vel_err={velocity_error:.4f}")
+                print(f"            kp={self.kp}, kd={self.kd}, ff={self.feedforward_torque:.4f}")
+                print(f"            kp*pos_err={self.kp * position_error:.4f}, kd*vel_err={self.kd * velocity_error:.4f}")
+                print(f"            torque_cmd={torque_cmd:.4f}")
         else:
             # Direct torque command
             torque_cmd = self.commanded_torque
@@ -125,43 +123,48 @@ class Motor:
         
         return torque_cmd
     
-    def update(self, true_position, true_velocity):
+    def update(self, true_position, true_velocity, initialize=False):
         """
         Update motor state (1ms time step).
         
         Args:
             true_position: True position from simulation (rad)
             true_velocity: True velocity from simulation (rad/s)
+            initialize: If True, initialize prev_encoder_position to current position
         """
         # Store true state from simulation
         self.true_position = true_position
         self.true_velocity = true_velocity
         
-        # Get quantized encoder readings
+        # Get quantized encoder position
         self.actual_position = self.get_encoder_position()
-        self.actual_velocity = self.get_encoder_velocity()
         
-        # Compute new torque command using estimated state
-        torque_cmd = self.compute_torque()
+        if initialize:
+            # On first call, set prev position to current to avoid velocity spike
+            self.prev_encoder_position = self.actual_position
+            self.actual_velocity = 0.0
+        else:
+            # Estimate velocity from encoder position difference
+            self.actual_velocity = self.get_encoder_velocity()
         
-        # Add to delay buffer
-        self.torque_buffer.append(torque_cmd)
-        
-        # Output is the delayed torque (2ms ago)
-        self.actual_torque = self.torque_buffer[0]
+        # Note: torque is computed in get_output_torque() after set_mit_params() is called
     
-    def get_output_torque(self, Bv=0.0):
+    def get_output_torque(self, Bv=0.0, debug=False):
         """
-        Get the delayed torque output with Stribeck friction model applied.
+        Compute and return torque output with Stribeck friction model applied.
         
         Args:
             Bv: Viscous friction coefficient (Nm·s/rad)
+            debug: Print debug info
         
         Returns:
-            Torque output with 2ms delay and friction (Nm)
+            Torque output with friction (Nm)
         """
-        # Motor velocity is the encoder velocity (time derivative of encoder position)
-        omega = self.get_encoder_velocity()
+        # Compute torque command using current state and desired setpoints
+        torque_cmd = self.compute_torque(debug=debug)
+        
+        # Use cached encoder velocity (computed in update())
+        omega = self.actual_velocity
         
         # Apply Stribeck friction model if parameters are set
         if all(param is not None for param in [self.T_coulomb, self.T_static, self.omega_s]):
@@ -172,17 +175,12 @@ class Motor:
                 np.sign(omega)
             )
             
-            # Add position-dependent sine wave variation
-            # Modulates friction by ±20% based on joint position
-            sine_modulation = self.friction_sine_amplitude * np.sin(self.true_position + self.friction_sine_phase)
-            friction_variation = stribeck_friction * sine_modulation
-            
-            friction_torque = stribeck_friction + friction_variation + Bv * omega
+            friction_torque = stribeck_friction + Bv * omega
             
             # Apply friction to output torque
-            output_torque = self.actual_torque - friction_torque
+            output_torque = torque_cmd - friction_torque
         else:
-            output_torque = self.actual_torque
+            output_torque = torque_cmd
         
         return output_torque
     
@@ -209,6 +207,7 @@ class Motor:
     def get_encoder_velocity(self):
         """
         Estimate velocity from encoder position difference.
+        Note: This should only be called once per timestep in update().
         
         Returns:
             Estimated velocity (rad/s)
@@ -222,6 +221,13 @@ class Motor:
         self.prev_encoder_position = current_encoder_pos
         
         return velocity
+    
+    def get_cached_encoder_velocity(self):
+        """
+        Get the cached encoder velocity (computed in update()).
+        Use this instead of get_encoder_velocity() to avoid side effects.
+        """
+        return self.actual_velocity
     
     def get_encoder_count(self):
         """
@@ -247,4 +253,3 @@ class Motor:
         self.desired_position = 0.0
         self.desired_velocity = 0.0
         self.feedforward_torque = 0.0
-        self.torque_buffer = deque([0.0, 0.0, 0.0], maxlen=3)
