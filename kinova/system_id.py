@@ -20,6 +20,7 @@ def view_trajectory():
     model = mujoco.MjModel.from_xml_path(model_path)
     data = mujoco.MjData(model)
     
+    
     # Generate demo trajectory
     TEST_JOINT = None  # Change to 0-6 to test single joint, or None for all
     trajectory, velocity = generate_demo_trajectory(seconds=10.0, test_joint=TEST_JOINT)
@@ -137,7 +138,7 @@ def system_id():
             actual_qpos = data.qpos[:7].copy()
             actual_qvel = data.qvel[:7].copy()
             
-            # Gravity comp: inverse dynamics with zero velocity and zero acceleration at actual position
+            # Gravity comp: inverse dynamics with zero velocity and zero acceleration at actual position because velocity terms might cause the loop to diverge.
             data.qvel[:7] = 0
             data.qacc[:7] = 0
             mujoco.mj_inverse(model, data)

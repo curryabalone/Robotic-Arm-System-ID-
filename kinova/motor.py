@@ -3,7 +3,7 @@ import numpy as np
 
 class Motor:
     """
-    Motor class implementing MIT controller with 2ms delay and 16-bit encoder quantization.
+    Motor class implementing MIT controller 14-bit encoder quantization.
     Each method call represents 1ms time step.
     """
     
