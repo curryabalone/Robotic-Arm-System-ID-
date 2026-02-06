@@ -427,7 +427,7 @@ If you use this tool in your research, please cite:
 @software{robot_sysid,
   title = {robot-sysid: A Generic Robot System Identification Tool},
   author = {Cai, Yuze},
-  year = {2024},
+  year = {2026},
   url = {https://github.com/curryabalone/Robotic-Arm-System-ID-}
 }
 ```
