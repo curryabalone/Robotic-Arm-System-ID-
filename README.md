@@ -41,8 +41,8 @@ The spatial dynamics regressor Y is derived symbolically via SymPy, ensuring ana
 
 ```bash
 # Clone the repository
-git clone https://github.com/curryabalone/Robotic-Arm-System-ID.git
-cd Robotic-Arm-System-ID
+git clone https://github.com/curryabalone/Robotic-Arm-System-ID-.git
+cd Robotic-Arm-System-ID-
 
 # Install in editable mode
 pip install -e .
@@ -428,6 +428,6 @@ If you use this tool in your research, please cite:
   title = {robot-sysid: A Generic Robot System Identification Tool},
   author = {Cai, Yuze},
   year = {2024},
-  url = {https://github.com/curryabalone/Robotic-Arm-System-ID}
+  url = {https://github.com/curryabalone/Robotic-Arm-System-ID-}
 }
 ```

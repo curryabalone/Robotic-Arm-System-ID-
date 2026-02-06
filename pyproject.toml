@@ -28,9 +28,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/curryabalone/Robotic-Arm-System-ID"
-Repository = "https://github.com/curryabalone/Robotic-Arm-System-ID"
-Issues = "https://github.com/curryabalone/Robotic-Arm-System-ID/issues"
+Homepage = "https://github.com/curryabalone/Robotic-Arm-System-ID-"
+Repository = "https://github.com/curryabalone/Robotic-Arm-System-ID-"
+Issues = "https://github.com/curryabalone/Robotic-Arm-System-ID-/issues"
 
 dependencies = [
     "numpy",
