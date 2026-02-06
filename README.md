@@ -34,10 +34,10 @@ The spatial dynamics regressor Y is derived symbolically via SymPy, ensuring ana
 
 ### Prerequisites
 
-- Python 3.8 or later
-- MuJoCo 3.0 or later (install via `pip install mujoco`)
+- Python 3.9 or later
+- MuJoCo 3.0 or later
 
-### Install from Source
+### Option 1: Install from Source (pip)
 
 ```bash
 # Clone the repository
@@ -49,6 +49,21 @@ pip install -e .
 ```
 
 This installs the `robot-sysid` command-line tool and all required dependencies (numpy, mujoco, sympy, scipy).
+
+### Option 2: Install with Conda Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/curryabalone/Robotic-Arm-System-ID-.git
+cd Robotic-Arm-System-ID-
+
+# Create and activate conda environment
+conda env create -f environment.yml
+conda activate robot-sysid
+
+# Install the package
+pip install -e .
+```
 
 ### Install with Development Dependencies
 

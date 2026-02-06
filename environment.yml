@@ -1,0 +1,14 @@
+name: robot-sysid
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - numpy
+      - mujoco>=3.0
+      - sympy
+      - scipy
+      - pytest
+      - hypothesis
