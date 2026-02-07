@@ -262,23 +262,39 @@ Values are automatically clamped to the specified Damiao motor limits. The tool 
 
 The tool uses the spatial dynamics formulation to derive a linear relationship between joint torques and inertial parameters:
 
-$$\tau = Y \theta$$
+```math
+\tau = Y \theta
+```
 
 Where:
-- $\tau$ — Joint torque (scalar for a single joint)
-- $Y$ — Regressor matrix (n_samples × 10 without friction, or n_samples × 12 with friction)
-- $\theta$ — Parameter vector: $[m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}]$ for inertial-only, or $[m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}, f_c, f_v]$ with friction
+1. $\tau$ — Joint torque (scalar for a single joint)
+2. $Y$ — Regressor matrix (n_samples × 10 without friction, or n_samples × 12 with friction)
+3. $\theta$ — Parameter vector: $[m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}]$ for inertial-only, or $[m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}, f_c, f_v]$ with friction
 
 The regressor Y is derived from the spatial dynamics equation:
 
-$$\mathbf{F}_a = \mathbf{G}_a \dot{\mathbf{V}}_a - [\text{ad}_{\mathbf{V}_a}]^T \mathbf{G}_a \mathbf{V}_a$$
+```math
+\mathbf{F}_a = \mathbf{G}_a \dot{\mathbf{V}}_a - [\text{ad}_{\mathbf{V}_a}]^T \mathbf{G}_a \mathbf{V}_a
+```
 
 Where:
-- $\mathbf{F}_a$ — 6D wrench (force + torque): $\mathbf{F}_a = \begin{bmatrix} \boldsymbol{\tau} \\ \mathbf{f} \end{bmatrix} \in \mathbb{R}^6$
-- $\mathbf{G}_a$ — Spatial inertia matrix (function of $\theta$)
-- $\mathbf{V}_a$ — Spatial velocity (angular + linear): $\mathbf{V}_a = \begin{bmatrix} \boldsymbol{\omega} \\ \mathbf{v} \end{bmatrix} \in \mathbb{R}^6$
-- $\dot{\mathbf{V}}_a$ — Spatial acceleration (angular + linear): $\dot{\mathbf{V}}_a = \begin{bmatrix} \dot{\boldsymbol{\omega}} \\ \dot{\mathbf{v}} \end{bmatrix} \in \mathbb{R}^6$
-- $[\text{ad}_{\mathbf{V}_a}]$ — Adjoint operator (captures gyroscopic effects)
+1. $\mathbf{F}_a$ — 6D wrench (force + torque).
+
+```math
+\mathbf{F}_a = \begin{bmatrix} \boldsymbol{\tau} \\ \mathbf{f} \end{bmatrix} \in \mathbb{R}^6
+```
+2. $\mathbf{G}_a$ — Spatial inertia matrix (function of $\theta$)
+3. $\mathbf{V}_a$ — Spatial velocity (angular + linear).
+
+```math
+\mathbf{V}_a = \begin{bmatrix} \boldsymbol{\omega} \\ \mathbf{v} \end{bmatrix} \in \mathbb{R}^6
+```
+4. $\dot{\mathbf{V}}_a$ — Spatial acceleration (angular + linear).
+
+```math
+\dot{\mathbf{V}}_a = \begin{bmatrix} \dot{\boldsymbol{\omega}} \\ \dot{\mathbf{v}} \end{bmatrix} \in \mathbb{R}^6
+```
+5. $[\text{ad}_{\mathbf{V}_a}]$ — Adjoint operator (captures gyroscopic effects)
 
 The 6D wrench is projected onto the joint axis to obtain the scalar joint torque. The regressor is derived symbolically using SymPy and cached for efficient evaluation.
 
@@ -286,31 +302,55 @@ The 6D wrench is projected onto the joint axis to obtain the scalar joint torque
 
 The spatial inertia matrix $\mathbf{G}_a \in \mathbb{R}^{6 \times 6}$ is defined as:
 
-$$\mathbf{G}_a = \begin{bmatrix} \bar{\mathbf{I}} & [\mathbf{h}]_\times \\ -[\mathbf{h}]_\times & m\mathbf{I}_3 \end{bmatrix}$$
+```math
+\mathbf{G}_a = \begin{bmatrix} \bar{\mathbf{I}} & [\mathbf{h}]_\times \\ -[\mathbf{h}]_\times & m\mathbf{I}_3 \end{bmatrix}
+```
 
 where:
-- $\bar{\mathbf{I}} = \begin{bmatrix} I_{xx} & I_{xy} & I_{xz} \\ I_{xy} & I_{yy} & I_{yz} \\ I_{xz} & I_{yz} & I_{zz} \end{bmatrix}$ is the inertia tensor
-- $\mathbf{h} = \begin{bmatrix} h_x \\ h_y \\ h_z \end{bmatrix} = m \mathbf{c}$ is the first moment of mass (mass times center of mass)
-- $[\mathbf{h}]_\times = \begin{bmatrix} 0 & -h_z & h_y \\ h_z & 0 & -h_x \\ -h_y & h_x & 0 \end{bmatrix}$ is the skew-symmetric matrix
+1. $\bar{\mathbf{I}}$ — inertia tensor.
+
+```math
+\bar{\mathbf{I}} = \begin{bmatrix} I_{xx} & I_{xy} & I_{xz} \\ I_{xy} & I_{yy} & I_{yz} \\ I_{xz} & I_{yz} & I_{zz} \end{bmatrix}
+```
+2. $\mathbf{h}$ — first moment of mass (mass times center of mass).
+
+```math
+\mathbf{h} = \begin{bmatrix} h_x \\ h_y \\ h_z \end{bmatrix} = m \mathbf{c}
+```
+3. $[\mathbf{h}]_\times$ — skew-symmetric matrix.
+
+```math
+[\mathbf{h}]_\times = \begin{bmatrix} 0 & -h_z & h_y \\ h_z & 0 & -h_x \\ -h_y & h_x & 0 \end{bmatrix}
+```
 
 The adjoint transpose $[\text{ad}_{\mathbf{V}_a}]^T \in \mathbb{R}^{6 \times 6}$ is:
 
-$$[\text{ad}_{\mathbf{V}_a}]^T = \begin{bmatrix} -[\boldsymbol{\omega}]_\times & -[\mathbf{v}]_\times \\ \mathbf{0}_{3 \times 3} & -[\boldsymbol{\omega}]_\times \end{bmatrix}$$
+```math
+[\text{ad}_{\mathbf{V}_a}]^T = \begin{bmatrix} -[\boldsymbol{\omega}]_\times & -[\mathbf{v}]_\times \\ \mathbf{0}_{3 \times 3} & -[\boldsymbol{\omega}]_\times \end{bmatrix}
+```
 
-where $[\boldsymbol{\omega}]_\times = \begin{bmatrix} 0 & -\omega_z & \omega_y \\ \omega_z & 0 & -\omega_x \\ -\omega_y & \omega_x & 0 \end{bmatrix}$ and $[\mathbf{v}]_\times$ is defined similarly.
+where:
+
+```math
+[\boldsymbol{\omega}]_\times = \begin{bmatrix} 0 & -\omega_z & \omega_y \\ \omega_z & 0 & -\omega_x \\ -\omega_y & \omega_x & 0 \end{bmatrix}
+```
+
+and $[\mathbf{v}]_\times$ is defined similarly.
 
 The full $6 \times 10$ regressor matrix $\mathbf{Y}$ is obtained by computing the Jacobian $\frac{\partial \mathbf{F}_a}{\partial \theta}$, where each element $Y_{ij} = \frac{\partial F_{a,i}}{\partial \theta_j}$.
 
 The complete regressor matrix with all 60 terms is:
 
-$$\mathbf{Y} = \begin{bmatrix}
+```math
+\mathbf{Y} = \begin{bmatrix}
 0 & 0 & \dot{v}_z + \omega_x v_y - \omega_y v_x & -\dot{v}_y + \omega_x v_z - \omega_z v_x & \dot{\omega}_x & \dot{\omega}_y - \omega_x \omega_z & \dot{\omega}_z + \omega_x \omega_y & -\omega_y \omega_z & \omega_y^2 - \omega_z^2 & \omega_y \omega_z \\
 0 & -\dot{v}_z - \omega_x v_y + \omega_y v_x & 0 & \dot{v}_x + \omega_y v_z - \omega_z v_y & \omega_x \omega_z & \dot{\omega}_x + \omega_y \omega_z & -\omega_x^2 + \omega_z^2 & \dot{\omega}_y & \dot{\omega}_z - \omega_x \omega_y & -\omega_x \omega_z \\
 0 & \dot{v}_y - \omega_x v_z + \omega_z v_x & -\dot{v}_x - \omega_y v_z + \omega_z v_y & 0 & -\omega_x \omega_y & \omega_x^2 - \omega_y^2 & \dot{\omega}_x - \omega_y \omega_z & \omega_x \omega_y & \dot{\omega}_y + \omega_x \omega_z & \dot{\omega}_z \\
 \dot{v}_x + \omega_y v_z - \omega_z v_y & -\omega_y^2 - \omega_z^2 & -\dot{\omega}_z + \omega_x \omega_y & \dot{\omega}_y + \omega_x \omega_z & 0 & 0 & 0 & 0 & 0 & 0 \\
 \dot{v}_y - \omega_x v_z + \omega_z v_x & \dot{\omega}_z + \omega_x \omega_y & -\omega_x^2 - \omega_z^2 & -\dot{\omega}_x + \omega_y \omega_z & 0 & 0 & 0 & 0 & 0 & 0 \\
 \dot{v}_z + \omega_x v_y - \omega_y v_x & -\dot{\omega}_y + \omega_x \omega_z & \dot{\omega}_x + \omega_y \omega_z & -\omega_x^2 - \omega_y^2 & 0 & 0 & 0 & 0 & 0 & 0
-\end{bmatrix}$$
+\end{bmatrix}
+```
 
 where:
 - Row 1: Torque component about x-axis ($n_x$)
@@ -336,23 +376,31 @@ Each row corresponds to one component of the 6D wrench $\mathbf{F}_a = [n_x, n_y
 
 For a revolute joint with axis $\mathbf{a} = [a_x, a_y, a_z]^T$, the scalar joint torque is obtained by projecting the angular torque components onto the joint axis:
 
-$$\tau = \mathbf{a}^T \begin{bmatrix} n_x \\ n_y \\ n_z \end{bmatrix} = \mathbf{a}^T \begin{bmatrix} \mathbf{Y}_{1,1:10} \\ \mathbf{Y}_{2,1:10} \\ \mathbf{Y}_{3,1:10} \end{bmatrix} \theta$$
+```math
+\tau = \mathbf{a}^T \begin{bmatrix} n_x \\ n_y \\ n_z \end{bmatrix} = \mathbf{a}^T \begin{bmatrix} \mathbf{Y}_{1,1:10} \\ \mathbf{Y}_{2,1:10} \\ \mathbf{Y}_{3,1:10} \end{bmatrix} \theta
+```
 
 where $\mathbf{Y}_{i,1:10}$ denotes row $i$ of the regressor matrix (the first three rows contain the angular torque components).
 
 This gives a $1 \times 10$ regressor row for each timestep. When friction is included, two additional columns are appended:
 
-$$\mathbf{Y}_{\text{friction}} = \begin{bmatrix} \mathbf{Y}_{\text{inertial}} & \text{sign}(\dot{q}) & \dot{q} \end{bmatrix}$$
+```math
+\mathbf{Y}_{\text{friction}} = \begin{bmatrix} \mathbf{Y}_{\text{inertial}} & \text{sign}(\dot{q}) & \dot{q} \end{bmatrix}
+```
 
 giving the extended parameter vector $\theta_{\text{ext}} = [m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}, f_c, f_v]^T$, where $f_c$ is Coulomb friction and $f_v$ is viscous friction.
 
 The complete friction model is:
 
-$$\tau_{\text{friction}} = f_c \cdot \text{sign}(\dot{q}) + f_v \cdot \dot{q}$$
+```math
+\tau_{\text{friction}} = f_c \cdot \text{sign}(\dot{q}) + f_v \cdot \dot{q}
+```
 
 And the total joint torque becomes:
 
-$$\tau_{\text{total}} = \mathbf{a}^T \begin{bmatrix} \mathbf{Y}_{1,1:10} \\ \mathbf{Y}_{2,1:10} \\ \mathbf{Y}_{3,1:10} \end{bmatrix} \theta_{\text{inertial}} + f_c \cdot \text{sign}(\dot{q}) + f_v \cdot \dot{q}$$
+```math
+\tau_{\text{total}} = \mathbf{a}^T \begin{bmatrix} \mathbf{Y}_{1,1:10} \\ \mathbf{Y}_{2,1:10} \\ \mathbf{Y}_{3,1:10} \end{bmatrix} \theta_{\text{inertial}} + f_c \cdot \text{sign}(\dot{q}) + f_v \cdot \dot{q}
+```
 
 where the first term represents the inertial torque contribution and the latter terms represent Coulomb and viscous friction.
 
@@ -370,7 +418,9 @@ Velocities and accelerations are computed analytically (exact derivatives of pos
 
 The parameter vector θ is recovered via least-squares:
 
-$$\theta = Y^{\dagger} \tau$$
+```math
+\theta = Y^{\dagger} \tau
+```
 
 Where $Y^{\dagger}$ is the Moore-Penrose pseudoinverse. The tool uses `np.linalg.lstsq` with `rcond=1e-10` for robust least-squares, which handles rank-deficient regressor matrices gracefully.
 
