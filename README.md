@@ -266,8 +266,8 @@ $$\tau = Y \theta$$
 
 Where:
 - $\tau$ — Joint torque (scalar for a single joint)
-- $Y$ — Regressor matrix (n_samples × 12 for friction, or n_samples × 10 without)
-- $\theta$ — Parameter vector $[m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}, f_c, f_v]$
+- $Y$ — Regressor matrix (n_samples × 10 without friction, or n_samples × 12 with friction)
+- $\theta$ — Parameter vector: $[m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}]$ for inertial-only, or $[m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}, f_c, f_v]$ with friction
 
 The regressor Y is derived from the spatial dynamics equation:
 
@@ -393,9 +393,11 @@ And columns correspond to parameters:
 
 Each row corresponds to one component of the 6D wrench $\mathbf{F}_a = [n_x, n_y, n_z, f_x, f_y, f_z]^T$, and each column corresponds to one inertial parameter in $\theta = [m, h_x, h_y, h_z, I_{xx}, I_{xy}, I_{xz}, I_{yy}, I_{yz}, I_{zz}]^T$.
 
-For a revolute joint with axis $\mathbf{a} = [a_x, a_y, a_z]^T$, the scalar joint torque is:
+For a revolute joint with axis $\mathbf{a} = [a_x, a_y, a_z]^T$, the scalar joint torque is obtained by projecting the angular torque components onto the joint axis:
 
-$$\tau = \mathbf{a}^T \begin{bmatrix} n_x \\ n_y \\ n_z \end{bmatrix} = \mathbf{a}^T \mathbf{Y}_{1:3,:} \theta$$
+$$\tau = \mathbf{a}^T \begin{bmatrix} n_x \\ n_y \\ n_z \end{bmatrix} = \mathbf{a}^T \begin{bmatrix} \mathbf{Y}_{1,1:10} \\ \mathbf{Y}_{2,1:10} \\ \mathbf{Y}_{3,1:10} \end{bmatrix} \theta$$
+
+where $\mathbf{Y}_{i,1:10}$ denotes row $i$ of the regressor matrix (the first three rows contain the angular torque components).
 
 This gives a $1 \times 10$ regressor row for each timestep. When friction is included, two additional columns are appended:
 
@@ -409,7 +411,9 @@ $$\tau_{\text{friction}} = f_c \cdot \text{sign}(\dot{q}) + f_v \cdot \dot{q}$$
 
 And the total joint torque becomes:
 
-$$\tau_{\text{total}} = \mathbf{a}^T \mathbf{Y}_{1:3,:} \theta_{\text{inertial}} + f_c \cdot \text{sign}(\dot{q}) + f_v \cdot \dot{q}$$
+$$\tau_{\text{total}} = \mathbf{a}^T \begin{bmatrix} \mathbf{Y}_{1,1:10} \\ \mathbf{Y}_{2,1:10} \\ \mathbf{Y}_{3,1:10} \end{bmatrix} \theta_{\text{inertial}} + f_c \cdot \text{sign}(\dot{q}) + f_v \cdot \dot{q}$$
+
+where the first term represents the inertial torque contribution and the latter terms represent Coulomb and viscous friction.
 
 ### Excitation Trajectory Design
 
