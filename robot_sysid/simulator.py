@@ -6,6 +6,7 @@ matrix and torque data for parameter identification.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import mujoco
@@ -17,6 +18,8 @@ from robot_sysid.regressor import (
     compute_joint_regressor_row_with_friction,
 )
 from robot_sysid.trajectory import Trajectory
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -125,8 +128,9 @@ def collect_sysid_data(
     eps = 1e-6
 
     n_samples = len(trajectory.time)
-    Y_list = []
-    tau_list = []
+    n_cols = 12 if include_friction else 10
+    Y = np.zeros((n_samples, n_cols))
+    tau = np.zeros(n_samples)
 
     # Collect data along the trajectory
     for i in range(n_samples):
@@ -249,18 +253,14 @@ def collect_sysid_data(
                 f"NaN detected in inverse dynamics torque"
             )
 
-        Y_list.append(Y_row)
-        tau_list.append(tau_mj)
+        Y[i, :] = Y_row
+        tau[i] = tau_mj
 
         # Progress reporting every 2000 samples
         if i % 2000 == 0 and i > 0:
-            print(
-                f"  Collecting data: {i}/{n_samples} ({100 * i / n_samples:.0f}%)"
+            logger.info(
+                "Collecting data: %d/%d (%.0f%%)", i, n_samples, 100 * i / n_samples
             )
-
-    # Stack into arrays
-    Y = np.array(Y_list)
-    tau = np.array(tau_list)
 
     # Compute condition number and rank
     condition_number = float(np.linalg.cond(Y))
