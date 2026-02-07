@@ -7,8 +7,12 @@ the joint torque τ = Y × θ, where θ is the vector of inertial parameters.
 The regressor is derived symbolically using SymPy and cached for efficient reuse.
 """
 
+import logging
+
 import sympy as sp
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def derive_regressor_from_spatial_eqn():
@@ -135,9 +139,9 @@ def get_regressor_func():
     """Get the cached regressor function (creates it on first call)."""
     global _regressor_func
     if _regressor_func is None:
-        print("Generating symbolic regressor (one-time cost)...")
+        logger.info("Generating symbolic regressor (one-time cost)...")
         _regressor_func = derive_regressor_from_spatial_eqn()
-        print("Done!")
+        logger.info("Symbolic regressor generation complete.")
     return _regressor_func
 
 
