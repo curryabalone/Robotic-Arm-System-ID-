@@ -27,17 +27,18 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 
-[project.urls]
-Homepage = "https://github.com/curryabalone/Robotic-Arm-System-ID-"
-Repository = "https://github.com/curryabalone/Robotic-Arm-System-ID-"
-Issues = "https://github.com/curryabalone/Robotic-Arm-System-ID-/issues"
-
 dependencies = [
     "numpy",
     "mujoco",
     "sympy",
     "scipy",
+    "defusedxml",
 ]
+
+[project.urls]
+Homepage = "https://github.com/curryabalone/Robotic-Arm-System-ID-"
+Repository = "https://github.com/curryabalone/Robotic-Arm-System-ID-"
+Issues = "https://github.com/curryabalone/Robotic-Arm-System-ID-/issues"
 
 [project.optional-dependencies]
 dev = [

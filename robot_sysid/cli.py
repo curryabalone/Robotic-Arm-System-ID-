@@ -7,9 +7,11 @@ pipeline: load model → generate trajectory → simulate → identify → expor
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
+from robot_sysid import __version__
 from robot_sysid.export import (
     export_damiao_trajectory,
     export_params_json,
@@ -130,11 +132,43 @@ Examples:
         help="Random seed for trajectory generation (default: None)",
     )
 
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Enable verbose (debug-level) logging output",
+    )
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
+
     args = parser.parse_args()
+
+    # Configure logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(levelname)s: %(message)s",
+    )
 
     # Validate arguments
     if args.export_damiao and not args.motor_types:
         parser.error("--export-damiao requires at least one --motor-type")
+
+    xml_path = Path(args.xml_path)
+    if xml_path.suffix.lower() not in (".xml", ".mjcf"):
+        parser.error(
+            f"Expected an XML model file (.xml or .mjcf), got '{xml_path.suffix}'"
+        )
+
+    if args.duration <= 0:
+        parser.error("--duration must be positive")
+
+    if args.sample_rate <= 0:
+        parser.error("--sample-rate must be positive")
 
     include_friction = not args.no_friction
 

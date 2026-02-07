@@ -8,13 +8,17 @@ motor playback.
 from __future__ import annotations
 
 import json
+import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import defusedxml.ElementTree as SafeET
 import numpy as np
 
 from robot_sysid.solver import IdentifiedParams
 from robot_sysid.trajectory import Trajectory
+
+logger = logging.getLogger(__name__)
 
 
 # Damiao motor limits extracted from Ragtime Arm/damiao.py
@@ -86,7 +90,7 @@ def export_updated_xml(
         IOError: If the output file cannot be written.
     """
     # Parse the original XML
-    tree = ET.parse(original_xml_path)
+    tree = SafeET.parse(original_xml_path)
     root = tree.getroot()
 
     # Find the terminal body by searching for a body with a joint matching

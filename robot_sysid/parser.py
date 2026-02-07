@@ -6,12 +6,17 @@ structure including joints, bodies, and inertial parameters.
 
 from __future__ import annotations
 
+import logging
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 
+import defusedxml.ElementTree as SafeET
+
 import mujoco
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -287,7 +292,7 @@ def _validate_meshes(xml_path: str, mesh_dir: str) -> None:
         FileNotFoundError: If any referenced mesh files are missing.
     """
     try:
-        tree = ET.parse(xml_path)
+        tree = SafeET.parse(xml_path)
     except ET.ParseError as e:
         raise ValueError(f"Failed to parse XML file '{xml_path}': {e}") from e
 
