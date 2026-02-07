@@ -304,71 +304,12 @@ The full $6 \times 10$ regressor matrix $\mathbf{Y}$ is obtained by computing th
 The complete regressor matrix with all 60 terms is:
 
 $$\mathbf{Y} = \begin{bmatrix}
-0 & 
-0 & 
-\dot{v}_z + \omega_x v_y - \omega_y v_x & 
--\dot{v}_y + \omega_x v_z - \omega_z v_x & 
-\dot{\omega}_x & 
-\dot{\omega}_y - \omega_x \omega_z & 
-\dot{\omega}_z + \omega_x \omega_y & 
--\omega_y \omega_z & 
-\omega_y^2 - \omega_z^2 & 
-\omega_y \omega_z \\
-
-0 & 
--\dot{v}_z - \omega_x v_y + \omega_y v_x & 
-0 & 
-\dot{v}_x + \omega_y v_z - \omega_z v_y & 
-\omega_x \omega_z & 
-\dot{\omega}_x + \omega_y \omega_z & 
--\omega_x^2 + \omega_z^2 & 
-\dot{\omega}_y & 
-\dot{\omega}_z - \omega_x \omega_y & 
--\omega_x \omega_z \\
-
-0 & 
-\dot{v}_y - \omega_x v_z + \omega_z v_x & 
--\dot{v}_x - \omega_y v_z + \omega_z v_y & 
-0 & 
--\omega_x \omega_y & 
-\omega_x^2 - \omega_y^2 & 
-\dot{\omega}_x - \omega_y \omega_z & 
-\omega_x \omega_y & 
-\dot{\omega}_y + \omega_x \omega_z & 
-\dot{\omega}_z \\
-
-\dot{v}_x + \omega_y v_z - \omega_z v_y & 
--\omega_y^2 - \omega_z^2 & 
--\dot{\omega}_z + \omega_x \omega_y & 
-\dot{\omega}_y + \omega_x \omega_z & 
-0 & 
-0 & 
-0 & 
-0 & 
-0 & 
-0 \\
-
-\dot{v}_y - \omega_x v_z + \omega_z v_x & 
-\dot{\omega}_z + \omega_x \omega_y & 
--\omega_x^2 - \omega_z^2 & 
--\dot{\omega}_x + \omega_y \omega_z & 
-0 & 
-0 & 
-0 & 
-0 & 
-0 & 
-0 \\
-
-\dot{v}_z + \omega_x v_y - \omega_y v_x & 
--\dot{\omega}_y + \omega_x \omega_z & 
-\dot{\omega}_x + \omega_y \omega_z & 
--\omega_x^2 - \omega_y^2 & 
-0 & 
-0 & 
-0 & 
-0 & 
-0 & 
-0
+0 & 0 & \dot{v}_z + \omega_x v_y - \omega_y v_x & -\dot{v}_y + \omega_x v_z - \omega_z v_x & \dot{\omega}_x & \dot{\omega}_y - \omega_x \omega_z & \dot{\omega}_z + \omega_x \omega_y & -\omega_y \omega_z & \omega_y^2 - \omega_z^2 & \omega_y \omega_z \\
+0 & -\dot{v}_z - \omega_x v_y + \omega_y v_x & 0 & \dot{v}_x + \omega_y v_z - \omega_z v_y & \omega_x \omega_z & \dot{\omega}_x + \omega_y \omega_z & -\omega_x^2 + \omega_z^2 & \dot{\omega}_y & \dot{\omega}_z - \omega_x \omega_y & -\omega_x \omega_z \\
+0 & \dot{v}_y - \omega_x v_z + \omega_z v_x & -\dot{v}_x - \omega_y v_z + \omega_z v_y & 0 & -\omega_x \omega_y & \omega_x^2 - \omega_y^2 & \dot{\omega}_x - \omega_y \omega_z & \omega_x \omega_y & \dot{\omega}_y + \omega_x \omega_z & \dot{\omega}_z \\
+\dot{v}_x + \omega_y v_z - \omega_z v_y & -\omega_y^2 - \omega_z^2 & -\dot{\omega}_z + \omega_x \omega_y & \dot{\omega}_y + \omega_x \omega_z & 0 & 0 & 0 & 0 & 0 & 0 \\
+\dot{v}_y - \omega_x v_z + \omega_z v_x & \dot{\omega}_z + \omega_x \omega_y & -\omega_x^2 - \omega_z^2 & -\dot{\omega}_x + \omega_y \omega_z & 0 & 0 & 0 & 0 & 0 & 0 \\
+\dot{v}_z + \omega_x v_y - \omega_y v_x & -\dot{\omega}_y + \omega_x \omega_z & \dot{\omega}_x + \omega_y \omega_z & -\omega_x^2 - \omega_y^2 & 0 & 0 & 0 & 0 & 0 & 0
 \end{bmatrix}$$
 
 where:
