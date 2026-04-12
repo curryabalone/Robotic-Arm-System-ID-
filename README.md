@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/499702ee-098e-4b2c-a539-d193c3bcb634
+
 # robot-sysid
 
 A generic robotic arm system identification tool that identifies the inertial parameters and friction of a robot's terminal (end-effector) link from MuJoCo simulation data.
