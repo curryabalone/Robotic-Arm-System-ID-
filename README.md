@@ -3,7 +3,7 @@
 
 
 https://github.com/user-attachments/assets/7ccd25d5-c0d5-49a7-a53f-2c4c5d72cfcf
-
+System identification performed on the end-effector of the Kinova Arm.
 
 # robot-sysid
 
