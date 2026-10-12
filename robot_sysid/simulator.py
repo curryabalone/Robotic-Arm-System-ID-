@@ -13,10 +13,7 @@ import mujoco
 import numpy as np
 
 from robot_sysid.parser import JointInfo
-from robot_sysid.regressor import (
-    compute_joint_regressor_row,
-    compute_joint_regressor_row_with_friction,
-)
+from robot_sysid.regressor import get_regressor_func
 from robot_sysid.trajectory import Trajectory
 
 logger = logging.getLogger(__name__)
@@ -27,15 +24,16 @@ class RegressorData:
     """Collected regressor matrix and torque data from simulation.
 
     Attributes:
-        Y: Regressor matrix of shape (n_samples, 10) or (n_samples, 12).
-        tau: Torque vector of shape (n_samples,).
+        Y: Regressor matrix of shape (n_rows, 10) or (n_rows, 12), with one
+            row per supporting joint per sample.
+        tau: Torque vector of shape (n_rows,).
         time: Timestamps of shape (n_samples,).
         condition_number: Condition number of the regressor matrix.
         matrix_rank: Rank of the regressor matrix.
     """
 
-    Y: np.ndarray  # (n_samples, 10) or (n_samples, 12)
-    tau: np.ndarray  # (n_samples,)
+    Y: np.ndarray  # (n_rows, 10) or (n_rows, 12)
+    tau: np.ndarray  # (n_rows,)
     time: np.ndarray  # (n_samples,)
     condition_number: float
     matrix_rank: int
@@ -58,11 +56,16 @@ def collect_sysid_data(
     The simulation uses MuJoCo's inverse dynamics (`mj_inverse`) to compute
     ground-truth torques. At each timestep, the function:
     1. Sets qpos, qvel, qacc from the trajectory
-    2. Computes Jacobians at the terminal joint site
-    3. Computes body-frame velocity and acceleration using finite-difference
-       Jdot and gravity addition
-    4. Builds a regressor row from the kinematic data
-    5. Records the inverse dynamics torque
+    2. Runs inverse dynamics
+    3. Reads the terminal body's velocity, acceleration (with gravity) and
+       Jacobian at its frame origin
+    4. Builds one regressor row per joint supporting the terminal body
+    5. Records the inverse dynamics torques
+
+    The terminal joint torque alone cannot observe the mass (it only sees the
+    moment about its axis), so the upstream joints are used as well. Their
+    torques are reduced to the terminal body's contribution by subtracting
+    inverse dynamics of the same model with that body's inertia removed.
 
     Args:
         xml_path: Path to the MuJoCo XML model file.
@@ -85,21 +88,13 @@ def collect_sysid_data(
     model = mujoco.MjModel.from_xml_path(xml_path)
     data = mujoco.MjData(model)
 
-    # Find terminal body and site IDs
+    # Find terminal body ID
     terminal_body_id = mujoco.mj_name2id(
         model, mujoco.mjtObj.mjOBJ_BODY, terminal_body_name
     )
     if terminal_body_id < 0:
         raise ValueError(
             f"Terminal body '{terminal_body_name}' not found in model"
-        )
-
-    terminal_site_id = mujoco.mj_name2id(
-        model, mujoco.mjtObj.mjOBJ_SITE, terminal_joint.site_name
-    )
-    if terminal_site_id < 0:
-        raise ValueError(
-            f"Terminal site '{terminal_joint.site_name}' not found in model"
         )
 
     # Find terminal joint ID for torque extraction
@@ -114,23 +109,36 @@ def collect_sysid_data(
     # Get the DOF address for this joint (for indexing qvel and qfrc_inverse)
     terminal_dof_idx = model.jnt_dofadr[terminal_joint_id]
 
-    # Joint axis in body frame
-    joint_axis = terminal_joint.axis
+    # DOFs of all joints between the world and the terminal body
+    chain_dofs = []
+    body_id = terminal_body_id
+    while body_id > 0:
+        jnt_start = model.body_jntadr[body_id]
+        for jnt_id in range(jnt_start, jnt_start + model.body_jntnum[body_id]):
+            chain_dofs.append(model.jnt_dofadr[jnt_id])
+        body_id = model.body_parentid[body_id]
+    chain_dofs = sorted(chain_dofs)
+    n_rows = len(chain_dofs)
+    terminal_row = chain_dofs.index(terminal_dof_idx)
 
-    # Gravity vector in world frame
-    g_world = np.array([0.0, 0.0, 9.81])
+    # Same model without the terminal body's inertia, to isolate its torques
+    model_wo = mujoco.MjModel.from_xml_path(xml_path)
+    model_wo.body_mass[terminal_body_id] = 0.0
+    model_wo.body_inertia[terminal_body_id] = 0.0
+    data_wo = mujoco.MjData(model_wo)
 
-    # Allocate Jacobian arrays
+    regressor_func = get_regressor_func()
+
+    # Allocate Jacobian and body motion arrays
     jacp = np.zeros((3, model.nv))
     jacr = np.zeros((3, model.nv))
-
-    # Finite difference epsilon for Jdot computation
-    eps = 1e-6
+    vel = np.zeros(6)
+    acc = np.zeros(6)
 
     n_samples = len(trajectory.time)
     n_cols = 12 if include_friction else 10
-    Y = np.zeros((n_samples, n_cols))
-    tau = np.zeros(n_samples)
+    Y = np.zeros((n_samples * n_rows, n_cols))
+    tau = np.zeros(n_samples * n_rows)
 
     # Collect data along the trajectory
     for i in range(n_samples):
@@ -138,52 +146,30 @@ def collect_sysid_data(
         qvel = trajectory.velocity[i, :]
         qacc = trajectory.acceleration[i, :]
 
-        # Set state
-        data.qpos[: trajectory.n_joints] = qpos
-        data.qvel[: trajectory.n_joints] = qvel
-        data.qacc[: trajectory.n_joints] = qacc
+        # Inverse dynamics with and without the terminal body
+        for m, d in ((model, data), (model_wo, data_wo)):
+            d.qpos[: trajectory.n_joints] = qpos
+            d.qvel[: trajectory.n_joints] = qvel
+            d.qacc[: trajectory.n_joints] = qacc
+            mujoco.mj_inverse(m, d)
+        mujoco.mj_rnePostConstraint(model, data)
 
-        # Compute kinematics
-        mujoco.mj_kinematics(model, data)
-        mujoco.mj_comPos(model, data)
-        mujoco.mj_crb(model, data)
+        # Exact body-frame velocity and acceleration (gravity included as an
+        # upward acceleration) of the terminal body origin
+        mujoco.mj_objectVelocity(
+            model, data, mujoco.mjtObj.mjOBJ_XBODY, terminal_body_id, vel, 1
+        )
+        mujoco.mj_objectAcceleration(
+            model, data, mujoco.mjtObj.mjOBJ_XBODY, terminal_body_id, acc, 1
+        )
+        w_local, v_local = vel[:3], vel[3:]
+        dw_local = acc[:3]
+        # Classical -> spatial acceleration, as used by the regressor
+        dv_local = acc[3:] - np.cross(w_local, v_local)
 
-        # Get Jacobian at terminal site
-        mujoco.mj_jacSite(model, data, jacp, jacr, terminal_site_id)
-
-        # Compute velocity in world frame
-        v_world = jacp @ qvel
-        w_world = jacr @ qvel
-
-        # Rotation matrix from world to body frame
+        # Jacobian at the terminal body origin, rotated into the body frame
+        mujoco.mj_jacBody(model, data, jacp, jacr, terminal_body_id)
         R = data.xmat[terminal_body_id].reshape(3, 3)
-
-        # Transform velocity to body frame
-        w_local = R.T @ w_world
-        v_local = R.T @ v_world
-
-        # Compute Jdot @ qvel via finite difference
-        # Perturb qpos by eps * qvel and recompute Jacobian
-        data.qpos[: trajectory.n_joints] = qpos + eps * qvel
-        mujoco.mj_kinematics(model, data)
-
-        jacp_plus = np.zeros((3, model.nv))
-        jacr_plus = np.zeros((3, model.nv))
-        mujoco.mj_jacSite(model, data, jacp_plus, jacr_plus, terminal_site_id)
-
-        Jdot_v_linear = (jacp_plus - jacp) @ qvel / eps
-        Jdot_v_angular = (jacr_plus - jacr) @ qvel / eps
-
-        # Full acceleration in world frame
-        dv_world = jacp @ qacc + Jdot_v_linear
-        dw_world = jacr @ qacc + Jdot_v_angular
-
-        # Add gravity to linear acceleration before transforming to body frame
-        dv_world_with_g = dv_world + g_world
-
-        # Transform acceleration to body frame
-        dw_local = R.T @ dw_world
-        dv_local = R.T @ dv_world_with_g - np.cross(w_local, v_local)
 
         # Check for NaN or divergence
         if np.any(np.isnan(w_local)) or np.any(np.isnan(v_local)):
@@ -197,64 +183,33 @@ def collect_sysid_data(
                 f"NaN detected in acceleration"
             )
 
-        # Compute regressor row
+        # Body wrench regressor (6x10), projected onto each chain joint's
+        # motion subspace expressed in the body frame
+        Y_body = np.asarray(
+            regressor_func(*w_local, *v_local, *dw_local, *dv_local), dtype=float
+        )
+        S = np.vstack([R.T @ jacr[:, chain_dofs], R.T @ jacp[:, chain_dofs]])
+        rows = slice(i * n_rows, (i + 1) * n_rows)
+        Y[rows, :10] = S.T @ Y_body
+
+        # Friction only acts on the terminal joint
         if include_friction:
-            # Get joint velocity for friction terms
             joint_velocity = qvel[terminal_dof_idx]
-            Y_row = compute_joint_regressor_row_with_friction(
-                w_local[0],
-                w_local[1],
-                w_local[2],
-                v_local[0],
-                v_local[1],
-                v_local[2],
-                dw_local[0],
-                dw_local[1],
-                dw_local[2],
-                dv_local[0],
-                dv_local[1],
-                dv_local[2],
-                joint_axis,
-                joint_velocity,
-            )
-        else:
-            Y_row = compute_joint_regressor_row(
-                w_local[0],
-                w_local[1],
-                w_local[2],
-                v_local[0],
-                v_local[1],
-                v_local[2],
-                dw_local[0],
-                dw_local[1],
-                dw_local[2],
-                dv_local[0],
-                dv_local[1],
-                dv_local[2],
-                joint_axis,
-            )
+            Y[i * n_rows + terminal_row, 10:] = [np.sign(joint_velocity), joint_velocity]
 
-        # Restore state and compute inverse dynamics
-        data.qpos[: trajectory.n_joints] = qpos
-        data.qvel[: trajectory.n_joints] = qvel
-        data.qacc[: trajectory.n_joints] = qacc
-        mujoco.mj_kinematics(model, data)
-        mujoco.mj_comPos(model, data)
-        mujoco.mj_crb(model, data)
-        mujoco.mj_inverse(model, data)
-
-        # Extract torque for terminal joint
-        tau_mj = data.qfrc_inverse[terminal_dof_idx]
+        # Upstream torques: terminal body's contribution only.
+        # Terminal joint: full torque, which also carries its friction.
+        tau_mj = data.qfrc_inverse[chain_dofs] - data_wo.qfrc_inverse[chain_dofs]
+        tau_mj[terminal_row] = data.qfrc_inverse[terminal_dof_idx]
 
         # Check for NaN in torque
-        if np.isnan(tau_mj):
+        if np.any(np.isnan(tau_mj)):
             raise RuntimeError(
                 f"Simulation diverged at timestep {i} (t={trajectory.time[i]:.3f}s): "
                 f"NaN detected in inverse dynamics torque"
             )
 
-        Y[i, :] = Y_row
-        tau[i] = tau_mj
+        tau[rows] = tau_mj
 
         # Progress reporting every 2000 samples
         if i % 2000 == 0 and i > 0:

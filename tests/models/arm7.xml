@@ -1,0 +1,39 @@
+<mujoco model="arm7">
+  <option gravity="0 0 -9.81"/>
+  <worldbody>
+    <body name="link1" pos="0 0 0.15">
+      <joint name="joint1" type="hinge" axis="0 0 1" range="-3 3"/><site name="joint1"/>
+      <inertial pos="0 -0.01 0.07" mass="1.4" diaginertia="0.005 0.005 0.002"/>
+      <body name="link2" pos="0 0.005 0.13" quat="0.7071 0.7071 0 0">
+        <joint name="joint2" type="hinge" axis="0 0 1" range="-2.2 2.2"/><site name="joint2"/>
+        <inertial pos="0 -0.1 -0.01" mass="1.2" diaginertia="0.01 0.002 0.01"/>
+        <body name="link3" pos="0 -0.2 0" quat="0.7071 -0.7071 0 0">
+          <joint name="joint3" type="hinge" axis="0 0 1" range="-3 3"/><site name="joint3"/>
+          <inertial pos="0 0.01 -0.1" mass="1.1" diaginertia="0.008 0.008 0.002"/>
+          <body name="link4" pos="0 0.006 -0.21" quat="0.7071 0.7071 0 0">
+            <joint name="joint4" type="hinge" axis="0 0 1" range="-2.5 2.5"/><site name="joint4"/>
+            <inertial pos="0 -0.08 -0.01" mass="0.9" diaginertia="0.004 0.001 0.004"/>
+            <body name="link5" pos="0 -0.2 0" quat="0.7071 -0.7071 0 0">
+              <joint name="joint5" type="hinge" axis="0 0 1" range="-3 3"/><site name="joint5"/>
+              <inertial pos="0 0.008 -0.06" mass="0.68" diaginertia="0.002 0.002 0.0006"/>
+              <body name="link6" pos="0 0 -0.1" quat="0.7071 0.7071 0 0">
+                <joint name="joint6" type="hinge" axis="0 0 1" range="-2 2"/><site name="joint6"/>
+                <inertial pos="0 -0.05 -0.01" mass="0.68" diaginertia="0.002 0.0006 0.002"/>
+                <body name="link7" pos="0 -0.1 0" quat="0.7071 -0.7071 0 0">
+                  <joint name="joint7" type="hinge" axis="0 0 1" range="-3 3"/><site name="joint7"/>
+                  <inertial pos="-9.2e-05 -0.079 0.0029" mass="0.58" fullinertia="0.0042 0.00072 0.0042 0.00001 0.000002 0.0003"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor joint="joint1" ctrlrange="-39 39"/><motor joint="joint2" ctrlrange="-39 39"/>
+    <motor joint="joint3" ctrlrange="-39 39"/><motor joint="joint4" ctrlrange="-39 39"/>
+    <motor joint="joint5" ctrlrange="-9 9"/><motor joint="joint6" ctrlrange="-9 9"/>
+    <motor joint="joint7" ctrlrange="-9 9"/>
+  </actuator>
+</mujoco>

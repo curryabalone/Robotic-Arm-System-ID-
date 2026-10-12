@@ -110,18 +110,24 @@ def export_updated_xml(
     if inertial is None:
         inertial = ET.SubElement(terminal_body, "inertial")
 
+    if not params.mass > 0:
+        raise ValueError(
+            f"Identified mass {params.mass:.6g} kg is not positive; "
+            f"cannot compute center of mass"
+        )
+
     # Compute center of mass from first moment: com = h / m
     com = params.com_moment / params.mass
 
-    # Convert inertia from [Ixx, Ixy, Ixz, Iyy, Iyz, Izz] to MuJoCo fullinertia
-    # format [Ixx, Iyy, Izz, Ixy, Ixz, Iyz]
+    # Identified inertia is about the body origin; MuJoCo expects it about the
+    # center of mass (parallel axis theorem)
+    Ixx, Ixy, Ixz, Iyy, Iyz, Izz = params.inertia
+    I_origin = np.array([[Ixx, Ixy, Ixz], [Ixy, Iyy, Iyz], [Ixz, Iyz, Izz]])
+    I_com = I_origin - params.mass * (com @ com * np.eye(3) - np.outer(com, com))
+
+    # MuJoCo fullinertia format [Ixx, Iyy, Izz, Ixy, Ixz, Iyz]
     fullinertia = np.array([
-        params.inertia[0],  # Ixx
-        params.inertia[3],  # Iyy
-        params.inertia[5],  # Izz
-        params.inertia[1],  # Ixy
-        params.inertia[2],  # Ixz
-        params.inertia[4],  # Iyz
+        I_com[0, 0], I_com[1, 1], I_com[2, 2], I_com[0, 1], I_com[0, 2], I_com[1, 2],
     ])
 
     # Update inertial attributes

@@ -114,7 +114,7 @@ Identified parameters:
   Viscous friction: 0.10 N·m·s/rad
   RMSE: 0.0001 N·m
   Condition number: 1234.5
-  Base parameters: 7
+  Base parameters: 12
 Results saved to ./sysid_output/
 ```
 
@@ -452,7 +452,7 @@ Where $Y^{\dagger}$ is the Moore-Penrose pseudoinverse. The tool uses `np.linalg
 
 ### Base Parameters
 
-Due to the structure of the dynamics equations, not all 10 inertial parameters are independently identifiable from single-joint torque measurements. The identifiable combinations are called **base parameters**. The tool reports the number of base parameters (matrix rank), which should be close to 10 for well-conditioned data.
+The terminal joint torque alone only observes the moment about its axis, so it cannot identify the mass. The tool therefore also uses every upstream joint torque, reduced to the terminal link's contribution by subtracting inverse dynamics of the model with that link's inertia removed. This makes all 10 inertial parameters identifiable. The tool reports the matrix rank, which should equal 10 (12 with friction).
 
 ## Project Structure
 
@@ -498,7 +498,7 @@ robot-sysid/
 - Verify that the model's joint limits are reasonable
 - Check that mesh files are correctly referenced
 
-### Low Matrix Rank (< 7 base parameters)
+### Low Matrix Rank (< 10 base parameters)
 
 **Possible causes:**
 - Insufficient excitation — regressor matrix is poorly conditioned

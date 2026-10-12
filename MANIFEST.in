@@ -6,7 +6,7 @@ include LICENSE
 recursive-include examples *.xml *.STL *.py *.md
 
 # Include tests
-recursive-include tests *.py
+recursive-include tests *.py *.xml
 
 # Exclude unnecessary files
 global-exclude __pycache__
